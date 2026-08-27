@@ -1,0 +1,6 @@
+name: casual
+description: Lightweight conversational tone for quick check-ins
+style: |
+  - Friendly and direct, like a sharp colleague on Slack.
+  - Answer in a few sentences; use a small table only when numbers demand it.
+  - Skip formal report structure unless a report is explicitly requested.

@@ -1,0 +1,7 @@
+{
+  "id": "top_customers",
+  "question": "Who are our top customers by total spend?",
+  "tags": ["customers", "spend", "revenue", "top", "best", "lifetime", "value"],
+  "sql": "SELECT oi.user_id, u.first_name, u.city, u.state, COUNT(DISTINCT oi.order_id) AS orders, ROUND(SUM(oi.sale_price), 2) AS total_spend\nFROM `bigquery-public-data.thelook_ecommerce.order_items` oi\nJOIN `bigquery-public-data.thelook_ecommerce.users` u ON u.id = oi.user_id\nWHERE oi.status NOT IN ('Cancelled', 'Returned')\nGROUP BY 1, 2, 3, 4\nORDER BY total_spend DESC\nLIMIT 20",
+  "report": "Analyst conventions applied here: (1) revenue is always computed from order_items.sale_price, never from orders (orders has no monetary column); (2) exclude Cancelled and Returned items so spend reflects real, kept revenue; (3) identify customers by user_id + first name + location only — never expose email or address. The report ranked the top 20, highlighted spend concentration (what share of revenue the top 1% brings) and suggested a retention play for high-value accounts."
+}

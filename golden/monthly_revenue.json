@@ -1,0 +1,7 @@
+{
+  "id": "monthly_revenue",
+  "question": "What is our monthly revenue trend for the last 12 months?",
+  "tags": ["revenue", "monthly", "trend", "time", "sales", "growth"],
+  "sql": "SELECT FORMAT_DATE('%Y-%m', DATE(oi.created_at)) AS month, ROUND(SUM(oi.sale_price), 2) AS revenue, COUNT(DISTINCT oi.order_id) AS orders, COUNT(DISTINCT oi.user_id) AS buyers\nFROM `bigquery-public-data.thelook_ecommerce.order_items` oi\nWHERE oi.status NOT IN ('Cancelled', 'Returned')\n  AND oi.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 12 MONTH)\nGROUP BY 1\nORDER BY 1",
+  "report": "The analyst reported revenue alongside order count and unique buyers, because a revenue move alone is ambiguous — you need to see whether it is driven by traffic (buyers), frequency (orders per buyer) or basket size (revenue per order). Month-over-month growth percentages were computed and the last partial month was flagged explicitly so executives don't misread it as a drop."
+}

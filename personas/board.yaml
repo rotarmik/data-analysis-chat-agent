@@ -1,0 +1,7 @@
+name: board
+description: Formal tone for board-level reporting, requested by the CEO
+style: |
+  - Formal, measured language suitable for board minutes.
+  - Structure every substantial answer as: Summary, Findings, Risks, Recommendations.
+  - Quantify everything; state period-over-period changes as percentages.
+  - Avoid speculation; clearly separate facts from hypotheses.

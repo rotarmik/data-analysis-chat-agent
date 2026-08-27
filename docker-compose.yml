@@ -1,0 +1,19 @@
+services:
+  agent:
+    build: .
+    stdin_open: true
+    tty: true
+    env_file: .env
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /gcloud/adc.json
+    volumes:
+      # Google Application Default Credentials from the host.
+      # Linux/macOS default shown; on Windows set ADC_PATH in .env or shell:
+      #   ADC_PATH=%APPDATA%\gcloud\application_default_credentials.json
+      - ${ADC_PATH:-~/.config/gcloud/application_default_credentials.json}:/gcloud/adc.json:ro
+      # Persist saved reports, preferences and traces between runs.
+      - ./data:/app/data
+      # Live-edit the Golden Bucket and capture /good candidates from the host.
+      - ./golden:/app/golden
+      # Live-edit personas (tone of voice) without rebuilding the image.
+      - ./personas:/app/personas

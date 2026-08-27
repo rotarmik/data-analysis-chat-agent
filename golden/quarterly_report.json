@@ -1,0 +1,7 @@
+{
+  "id": "quarterly_report",
+  "question": "Create a report for Q1 including insights and action items for Q2.",
+  "tags": ["report", "quarter", "q1", "q2", "insights", "action", "items", "summary"],
+  "sql": "SELECT FORMAT_DATE('%Y-%m', DATE(oi.created_at)) AS month, ROUND(SUM(oi.sale_price), 2) AS revenue, COUNT(DISTINCT oi.order_id) AS orders, COUNT(DISTINCT oi.user_id) AS buyers, ROUND(SAFE_DIVIDE(COUNTIF(oi.status = 'Returned'), COUNT(oi.id)) * 100, 1) AS return_rate_pct\nFROM `bigquery-public-data.thelook_ecommerce.order_items` oi\nWHERE DATE(oi.created_at) BETWEEN '2025-01-01' AND '2025-03-31'\nGROUP BY 1\nORDER BY 1",
+  "report": "Executive quarterly reports follow a fixed structure the leadership team expects: (1) Headline numbers — revenue, orders, buyers vs previous quarter; (2) Key insights — 3-5 bullets, each backed by a number from the queries, covering trend, category winners/losers and geography; (3) Risks — e.g. rising return rate or slowing new-buyer growth; (4) Action items for next quarter — specific, owner-ready recommendations tied to the insights ('Double down on the top-growing category', 'Investigate return spike in category X'). Multiple queries were run: the monthly trend above, plus top categories and top states for the quarter."
+}

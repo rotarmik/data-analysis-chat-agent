@@ -1,0 +1,12 @@
+deepagents>=0.2
+langchain-ollama>=0.2
+langgraph>=0.2
+google-cloud-bigquery>=3.25
+google-cloud-bigquery-storage>=2.24
+pandas>=2.0
+tabulate>=0.9
+db-dtypes>=1.2
+rich>=13.7
+langfuse>=3.0
+python-dotenv>=1.0
+PyYAML>=6.0

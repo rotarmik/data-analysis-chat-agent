@@ -1,0 +1,7 @@
+{
+  "id": "state_spend",
+  "question": "Why are users from state X underspending, and how do they compare to users in state Y?",
+  "tags": ["state", "geography", "spend", "underspending", "compare", "users", "region"],
+  "sql": "SELECT u.state, COUNT(DISTINCT u.id) AS users, COUNT(DISTINCT oi.user_id) AS buyers, ROUND(SAFE_DIVIDE(SUM(oi.sale_price), COUNT(DISTINCT oi.user_id)), 2) AS spend_per_buyer, ROUND(SAFE_DIVIDE(SUM(oi.sale_price), COUNT(DISTINCT oi.order_id)), 2) AS avg_order_value, ROUND(SAFE_DIVIDE(COUNT(DISTINCT oi.order_id), COUNT(DISTINCT oi.user_id)), 2) AS orders_per_buyer\nFROM `bigquery-public-data.thelook_ecommerce.users` u\nLEFT JOIN `bigquery-public-data.thelook_ecommerce.order_items` oi ON oi.user_id = u.id AND oi.status NOT IN ('Cancelled', 'Returned')\nWHERE u.country = 'United States' AND u.state IN ('Texas', 'California')\nGROUP BY 1",
+  "report": "'Underspending' must be decomposed before it can be explained. The analyst compared conversion (buyers/users), frequency (orders per buyer) and basket size (avg order value) between the two states — each points to a different root cause (acquisition quality vs engagement vs pricing/mix). They also checked category mix and traffic_source distribution per state as secondary drivers, and normalized everything per-user so state size differences don't distort the comparison."
+}

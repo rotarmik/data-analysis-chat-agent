@@ -1,0 +1,7 @@
+{
+  "id": "churn_analysis",
+  "question": "Why did our churn rate spike last month?",
+  "tags": ["churn", "retention", "spike", "repeat", "customers", "cohort", "returns"],
+  "sql": "WITH monthly_buyers AS (\n  SELECT DATE_TRUNC(DATE(created_at), MONTH) AS month, user_id\n  FROM `bigquery-public-data.thelook_ecommerce.order_items`\n  WHERE status NOT IN ('Cancelled', 'Returned')\n  GROUP BY 1, 2\n)\nSELECT cur.month, COUNT(DISTINCT cur.user_id) AS active_buyers, COUNT(DISTINCT prev.user_id) AS retained_from_prev_month, ROUND(SAFE_DIVIDE(COUNT(DISTINCT prev.user_id), COUNT(DISTINCT cur.user_id)) * 100, 1) AS retention_pct\nFROM monthly_buyers cur\nLEFT JOIN monthly_buyers prev ON prev.user_id = cur.user_id AND prev.month = DATE_SUB(cur.month, INTERVAL 1 MONTH)\nWHERE cur.month >= DATE_SUB(CURRENT_DATE(), INTERVAL 8 MONTH)\nGROUP BY 1\nORDER BY 1",
+  "report": "This dataset has no subscription table, so the analyst defined churn operationally as the drop in month-over-month repeat buying and stated that definition up front. The investigation followed a funnel: (1) confirm the spike is real and not a partial-month artifact, (2) segment the churned cohort by state, traffic_source and first-purchase category to find where it concentrates, (3) check return rates and delivery delays in the preceding month as candidate causes. The report separated 'what we can prove from data' from hypotheses needing follow-up."
+}
