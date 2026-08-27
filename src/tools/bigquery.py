@@ -9,7 +9,7 @@ from google.cloud import bigquery
 from langchain_core.tools import tool
 
 from src.config import settings
-from src.safety.pii import find_blocked_columns
+from src.safety.pii import BLOCKED_COLUMNS, find_blocked_columns
 
 FORBIDDEN_KEYWORDS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|MERGE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE|CALL|EXECUTE|EXPORT)\b",
@@ -67,6 +67,14 @@ def run_sql(sql: str) -> str:
     except Exception as exc:
         return f"SQL_ERROR: {exc}\nAnalyze the error, fix the query and retry (max {settings.max_sql_attempts} attempts total)."
 
+    # Second PII layer: SELECT * style queries pass text validation but can
+    # still pull blocked columns — strip them from the result itself.
+    leaked = [c for c in df.columns if c.lower() in BLOCKED_COLUMNS]
+    pii_note = ""
+    if leaked:
+        df = df.drop(columns=leaked)
+        pii_note = f"\n\nNote: PII columns were removed from the result: {', '.join(leaked)}."
+
     if df.empty:
         return (
             "EMPTY_RESULT: the query ran successfully but returned 0 rows. "
@@ -78,7 +86,7 @@ def run_sql(sql: str) -> str:
     preview = df.head(settings.max_result_rows)
     table = preview.to_markdown(index=False)
     suffix = f"\n\n(showing {len(preview)} of {total} rows)" if total > len(preview) else f"\n\n({total} rows)"
-    return table + suffix
+    return table + suffix + pii_note
 
 
 @tool

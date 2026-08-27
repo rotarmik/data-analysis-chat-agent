@@ -117,7 +117,9 @@ prompt override, nonexistent entities). Each answer is scored by:
 2. **LLM-as-judge** — 1–5 score against a per-case intent rubric.
 
 A case passes at score ≥ 4 with zero deterministic failures; the run exits
-non-zero otherwise, so it slots into CI as a release gate. *Verifying intent*:
+non-zero otherwise, so it slots into CI as a release gate. In the prototype
+the judge runs on the same model as the agent (a known self-judging bias);
+in production the judge is a different, cheaper model (Gemini Flash). *Verifying intent*:
 the judge rubric encodes what a correct answer must contain (numbers, drivers,
 trend statement), not surface form. *Evaluating UX*: session metrics (turn
 latency, clarification rate, self-correction rate) plus in-product feedback
@@ -195,7 +197,26 @@ only affects what is sent to the model, so no conversation data is lost.
 Summarization thresholds are deepagents defaults — ample for executive
 sessions; they are tunable if production traffic shows longer dialogs.
 
-## 4. Cost control summary
+## 4. Extensibility (new capabilities, new data sources)
+
+The agent's capability surface is its tool list — extension is additive, no
+core changes:
+
+- **New capability = new tool.** Chart generation: a `render_chart` tool
+  (matplotlib → PNG path / artifact). Email: a `send_report` tool — outward
+  side effects, so it gets an `interrupt_on` entry like deletion does. Web
+  trend search: a search tool whose results are cited separately from
+  warehouse facts. Each is a file in `src/tools/` plus one line in the TOOLS
+  list; heavier capabilities can run as deepagents subagents to keep the main
+  context clean.
+- **New data source = one adapter + one schema block + a few trios.** `run_sql`
+  is the pattern: a guarded execute function, a schema description for the
+  system prompt, PII deny-list entries, and seed golden trios teaching its
+  conventions. Nothing else in the system knows about BigQuery specifically.
+- **New behavior without code at all**: personas (tone), preferences (per-user)
+  and golden trios (analyst know-how) are all data, hot-reloaded every turn.
+
+## 5. Cost control summary
 
 Bounded SQL retries (3), byte-capped queries (2 GB), recursion-limited agent
 loop (50), capped result rows into context (50), fallback to the same-or-
