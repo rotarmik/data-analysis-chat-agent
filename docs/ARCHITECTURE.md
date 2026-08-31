@@ -133,15 +133,37 @@ UX notes: the flow adds exactly one click for the destructive case and zero
 friction anywhere else; users can only ever delete their own reports (ownership
 is enforced in the storage layer, not by the model).
 
-## 4. Golden Bucket: retrieval and update loop
+## 4. Golden Bucket: the full pipeline
 
-**At query time** the question is embedded and the top-k most similar trios are
-retrieved and injected into the model context as worked examples. This transfers
-analyst conventions the schema alone cannot teach (e.g. "revenue excludes
-cancelled/returned items", "decompose 'underspending' into conversion ×
-frequency × basket size").
+**What a trio is.** A JSON document of four fields: `question` (as an executive
+would phrase it), `tags` (manual recall expanders — "churn" also matches
+"retention" and "repeat"), `sql` (the analyst's query with conventions baked
+in) and `report`. The `report` field is the analyst's *methodology*, not output
+text: the churn trio, for example, records that this dataset has no
+subscription table, so churn is defined operationally as the drop in
+month-over-month repeat buying; that a spike must first be checked against
+partial-month artifacts; and that proven facts must be kept separate from
+hypotheses. 
 
-**Over time** the bucket grows through a curated pipeline:
+**Retrieval (query time).** The system prompt obliges the agent to call
+`search_golden_examples` before writing any SQL. In the prototype
+(`src/tools/golden.py`) retrieval is lexical: the question is tokenized minus
+stopwords and scored by Jaccard overlap against each trio's `question + tags`;
+the top-2 matches are returned in full. In production the same interface is
+served by Vertex AI Vector Search: `question + tags` are embedded — not the
+SQL, because retrieval is by intent, not by implementation — and search is
+semantic top-k gated by a **similarity threshold**: below it the tool honestly
+answers "no similar past analyses found" instead of injecting a weak match,
+since an irrelevant example misleads more than no example.
+
+**Generation.** Matched trios enter the model context as past-analysis blocks
+(question, analyst SQL, methodology). The agent transfers the conventions —
+revenue excludes cancelled/returned items, how to decompose "underspending"
+into conversion × frequency × basket size, the report structure executives
+expect — onto the new question. This is few-shot transfer, not copy-paste: an
+incoming question almost never matches a trio verbatim.
+
+**Ingestion (over time)** — the bucket grows through a curated pipeline:
 
 ```mermaid
 flowchart LR
@@ -157,8 +179,17 @@ flowchart LR
 Key decisions:
 - **Humans stay in the loop**: only analyst-approved trios enter the bucket, so
   one bad LLM answer can never poison future retrievals.
+- **Dedup on ingest**: a candidate is compared by vector similarity against
+  existing trios; near-duplicates reach the reviewer as "update existing"
+  rather than "add new", keeping the bucket small and unambiguous.
 - Negative feedback becomes eval cases, hardening the regression suite.
-- Trios are versioned in GCS; the index rebuild is a nightly batch job.
+- Trios are versioned in GCS — bucket versioning doubles as an audit trail of
+  who changed which convention; the index rebuild is a nightly batch job.
+
+**Freshness.** A nightly job dry-runs every trio's SQL against the warehouse
+(BigQuery `dry_run`, zero bytes billed). A trio whose SQL no longer validates —
+schema drift, a renamed column — is quarantined out of retrieval before the
+agent can copy a broken pattern, and lands in the review queue for repair.
 
 **In the prototype** the capture step of this pipeline is the `/good` CLI
 command: it assembles a candidate trio from the last exchange — the user's
@@ -189,3 +220,31 @@ The prototype was intentionally built with the same component boundaries as the
 production design — every local substitute sits behind the same interface as
 its cloud counterpart, so promotion is a matter of swapping adapters, not
 rewriting the agent.
+
+## 6. Path to production: task breakdown
+
+1. **Service skeleton.** FastAPI on Cloud Run. `POST /chat` accepts
+   `{session_id, message}` and streams the answer over SSE (LangGraph's
+   `astream` maps to it directly). Health endpoint, request timeouts,
+   concurrency limits.
+2. **Confirmation flow over HTTP** — In the CLI a
+   destructive call pauses the graph and the terminal asks for approval. Over
+   HTTP: `/chat` returns a `pending_confirmation` payload (tool name, args,
+   the model's stated reason — the same data the CLI renders today), and a
+   separate `POST /chat/confirm` with `{session_id, decision}` resumes the
+   graph via `Command(resume=...)`. Works across replicas because the state is
+   checkpointed, not held in memory.
+3. **Auth.** IAP / API Gateway in front; JWT → username, replacing the CLI's
+   `/user` command. Per-user rate limiting. Ownership scoping in storage
+   already keys on username
+4. **State.** Swap the in-memory LangGraph checkpointer for the Firestore one;
+   `thread_id` = session id, TTL on old sessions. 
+5. **LLM.** `ChatOllama` → `ChatVertexAI` (Gemini Pro primary, Flash
+   fallback) — one class and env vars; the retry/fallback wrapper already
+   exists. Add a circuit breaker around the router.
+6. **Storage swap.** SQLite → Firestore for reports and preferences, behind
+   the existing storage interface; personas move from YAML files to a
+   Firestore collection with the same hot-reload-per-turn behavior.
+7. **Golden bucket.** Trios to GCS, embeddings into Vertex AI Vector Search
+   behind the existing `search_trios` interface; `/good` becomes a feedback
+   endpoint publishing to Pub/Sub, candidates land in a review queue (§4).

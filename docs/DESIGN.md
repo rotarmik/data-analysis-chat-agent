@@ -19,20 +19,26 @@ production.
 
 ### R1 — Hybrid Intelligence (Golden Bucket)
 
-*Prototype*: `golden/` holds Question → SQL → Report trios. The
-`search_golden_examples` tool retrieves the most similar trios (lexical
-overlap scoring) and the system prompt obliges the agent to consult it before
-writing SQL. The trios carry analyst conventions that the schema cannot teach:
-revenue definition, how to decompose "underspending" or "churn", report
-structure executives expect.
+*Prototype*: `golden/` holds Question → SQL → Report trios; the `report` field
+is the analyst's methodology (definitions, decomposition steps, caveats), not
+output text. The `search_golden_examples` tool retrieves the top-2 most
+similar trios — Jaccard overlap of the question against each trio's
+`question + tags`, stopwords removed — and the system prompt obliges the agent
+to consult it before writing SQL. The trios carry analyst conventions that the
+schema cannot teach: revenue definition, how to decompose "underspending" or
+"churn", report structure executives expect.
 
-*Production*: trios live in GCS, embedded into Vertex AI Vector Search;
-retrieval is semantic top-k with a similarity threshold.
+*Production*: trios are canonical JSON in GCS . `question + tags` are embedded into Vertex AI Vector Search — the
+question, not the SQL, because retrieval is by intent. Retrieval is semantic
+top-k gated by a similarity threshold: below it the agent is told "no similar
+past analyses" instead of receiving a weak match — an irrelevant example
+misleads more than no example.
 
-*Updating over time*: see the learning-loop diagram in ARCHITECTURE.md §4 —
-positive feedback (👍, saved/shared reports) produces candidate trios that a
-human analyst reviews before publication; the index is rebuilt nightly. Human
-curation prevents feedback loops from poisoning the knowledge base.
+*Updating over time*: see ARCHITECTURE.md §4 for the full pipeline — positive
+feedback (👍, saved/shared reports) produces candidate trios that a human
+analyst reviews before publication, with vector-similarity dedup against
+existing trios on ingest; the index is rebuilt nightly, and a nightly dry-run
+of every trio's SQL quarantines entries broken by schema drift. 
 
 ### R2 — Safety & PII Masking
 
